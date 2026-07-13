@@ -1,3 +1,20 @@
+# --- Serveur Flask pour UptimeRobot ---
+from flask import Flask
+from threading import Thread
+
+app = Flask('')
+
+@app.route('/')
+def home():
+    return "Bot en ligne !"
+
+def run():
+    app.run(host='0.0.0.0', port=8080)
+
+Thread(target=run).start()
+
+
+# --- Ton bot Discord ---
 from datetime import datetime
 import os
 import discord
@@ -17,15 +34,13 @@ async def get_or_create_status_message():
 
     channel = bot.get_channel(CHANNEL_ID)
 
-    # Si on a un ID, on essaie de récupérer le message
     if status_message_id is not None:
         try:
             msg = await channel.fetch_message(status_message_id)
             return msg
         except:
-            pass  # Le message n'existe plus → on le recrée
+            pass
 
-    # Créer un nouveau message
     msg = await channel.send("📊 Statut des joueurs :\n\nChargement...")
     status_message_id = msg.id
     return msg
