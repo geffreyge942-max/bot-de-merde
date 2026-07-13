@@ -9,8 +9,10 @@ bot = commands.Bot(command_prefix="!", intents=intents)
 
 CHANNEL_ID = 1526002817058344960
 status_message_id = None
-en_jeu = {}
-deco = {}
+
+# 🔥 Juste des listes simples
+en_jeu = set()
+deco = set()
 
 async def get_or_create_status_message():
     global status_message_id
@@ -29,49 +31,59 @@ async def get_or_create_status_message():
 
 async def update_status():
     msg = await get_or_create_status_message()
+
     texte = "**📊 Statut des joueurs :**\n\n"
 
-    for user, start in en_jeu.items():
-        diff = datetime.now() - start
-        minutes = int(diff.total_seconds() // 60)
-        texte += f"🟢 **{user}** — en jeu depuis **{minutes} min**\n"
+    # 🔥 Joueurs en ligne
+    for user in en_jeu:
+        texte += f"🟢 **{user}** — en ligne\n"
 
-    for user, stop_time in deco.items():
-        diff = datetime.now() - stop_time
-        minutes = int(diff.total_seconds() // 60)
-        texte += f"🔴 **{user}** — déconnecté depuis **{minutes} min**\n"
+    # 🔥 Joueurs hors ligne
+    for user in deco:
+        texte += f"🔴 **{user}** — hors ligne\n"
 
     await msg.edit(content=texte)
-
-# 🔥 Boucle anti‑veille
-async def anti_veille():
-    while True:
-        await asyncio.sleep(30)
-        print("Anti‑veille : toujours actif")
 
 @bot.event
 async def on_ready():
     print("Bot prêt !")
     await get_or_create_status_message()
-    bot.loop.create_task(anti_veille())  # ✅ déplacé ici
 
 @bot.command()
 async def go(ctx):
     user = ctx.author.name
-    en_jeu[user] = datetime.now()
-    deco.pop(user, None)
+
+    # 🔥 Mise à jour des listes
+    en_jeu.add(user)
+    deco.discard(user)
+
     await update_status()
-    await ctx.send(f"{user} vient de lancer le jeu.")
+    await ctx.send(f"{user} est maintenant en ligne.")
 
 @bot.command()
 async def stop(ctx):
     user = ctx.author.name
+
     if user not in en_jeu:
-        await ctx.send("Tu n'étais pas enregistré comme en jeu.")
+        await ctx.send("Tu n'étais pas enregistré comme en ligne.")
         return
-    deco[user] = datetime.now()
-    en_jeu.pop(user, None)
+
+    en_jeu.discard(user)
+    deco.add(user)
+
     await update_status()
-    await ctx.send(f"{user} vient de se déconnecter.")
+    await ctx.send(f"{user} est maintenant hors ligne.")
+
+# 🔥 Boucle anti-veille
+async def anti_veille():
+    while True:
+        await asyncio.sleep(30)
+        print("Anti-veille : toujours actif")
+
+@bot.event
+async def on_ready():
+    print("Bot prêt !")
+    await get_or_create_status_message()
+    bot.loop.create_task(anti_veille())
 
 bot.run(os.getenv("TOKEN"))
