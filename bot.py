@@ -6,7 +6,7 @@ app = Flask('')
 
 @app.route('/')
 def home():
-    return "Bot en ligne !"
+    return "Bot en ligne ou taz maaaaaman !"
 
 def run():
     app.run(host='0.0.0.0', port=8080)
