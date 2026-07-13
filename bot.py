@@ -14,7 +14,6 @@ deco = {}
 
 async def get_or_create_status_message():
     global status_message_id
-
     channel = bot.get_channel(CHANNEL_ID)
 
     if status_message_id is not None:
@@ -30,7 +29,6 @@ async def get_or_create_status_message():
 
 async def update_status():
     msg = await get_or_create_status_message()
-
     texte = "**📊 Statut des joueurs :**\n\n"
 
     for user, start in en_jeu.items():
@@ -45,10 +43,17 @@ async def update_status():
 
     await msg.edit(content=texte)
 
+# 🔥 Boucle anti‑veille
+async def anti_veille():
+    while True:
+        await asyncio.sleep(30)
+        print("Anti‑veille : toujours actif")
+
 @bot.event
 async def on_ready():
     print("Bot prêt !")
     await get_or_create_status_message()
+    bot.loop.create_task(anti_veille())  # ✅ déplacé ici
 
 @bot.command()
 async def go(ctx):
@@ -64,18 +69,9 @@ async def stop(ctx):
     if user not in en_jeu:
         await ctx.send("Tu n'étais pas enregistré comme en jeu.")
         return
-
     deco[user] = datetime.now()
     en_jeu.pop(user, None)
     await update_status()
     await ctx.send(f"{user} vient de se déconnecter.")
-
-# 🔥 Boucle anti-veille
-async def anti_veille():
-    while True:
-        await asyncio.sleep(30)
-        print("Anti-veille : toujours actif")
-
-bot.loop.create_task(anti_veille())
 
 bot.run(os.getenv("TOKEN"))
