@@ -6,20 +6,32 @@ from discord.ext import commands
 intents = discord.Intents.all()
 bot = commands.Bot(command_prefix="!", intents=intents)
 
-# Stockage des heures
+CHANNEL_ID = 1526002817058344960
+status_message_id = None
 en_jeu = {}
 deco = {}
 
-# ID du salon où afficher les infos
-CHANNEL_ID = 1526002817058344960
-status_message = None
-
-async def update_status():
-    global status_message
+async def get_or_create_status_message():
+    global status_message_id
 
     channel = bot.get_channel(CHANNEL_ID)
-    if status_message is None:
-        status_message = await channel.send("Chargement des statuts...")
+
+    # Si on a déjà un ID, on essaie de récupérer le message
+    if status_message_id is not None:
+        try:
+            msg = await channel.fetch_message(status_message_id)
+            return msg
+        except:
+            # Le message n'existe plus → on va le recréer
+            pass
+
+    # Créer un nouveau message
+    msg = await channel.send("📊 Statut des joueurs :\n\nChargement...")
+    status_message_id = msg.id
+    return msg
+
+async def update_status():
+    msg = await get_or_create_status_message()
 
     texte = "**📊 Statut des joueurs :**\n\n"
 
@@ -33,7 +45,12 @@ async def update_status():
         minutes = int(diff.total_seconds() // 60)
         texte += f"🔴 **{user}** — déconnecté depuis **{minutes} min**\n"
 
-    await status_message.edit(content=texte)
+    await msg.edit(content=texte)
+
+@bot.event
+async def on_ready():
+    print("Bot prêt !")
+    await get_or_create_status_message()
 
 @bot.command()
 async def go(ctx):
