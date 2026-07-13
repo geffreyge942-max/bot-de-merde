@@ -23,7 +23,7 @@ from discord.ext import commands
 intents = discord.Intents.all()
 bot = commands.Bot(command_prefix="!", intents=intents)
 
-CHANNEL_ID = 1526232996175413280
+CHANNEL_ID = 1526002817058344960
 status_message_id = None
 
 en_jeu = {}
@@ -34,15 +34,21 @@ async def get_or_create_status_message():
 
     channel = bot.get_channel(CHANNEL_ID)
 
+    # Si un message existe déjà, on tente de le récupérer
     if status_message_id is not None:
         try:
             msg = await channel.fetch_message(status_message_id)
             return msg
         except:
-            pass
+            pass  # Le message n'existe plus → on le recrée
 
+    # Créer un nouveau message
     msg = await channel.send("📊 Statut des joueurs :\n\nChargement...")
     status_message_id = msg.id
+
+    # 🔥 On épingle le message automatiquement
+    await msg.pin()
+
     return msg
 
 async def update_status():
@@ -50,11 +56,13 @@ async def update_status():
 
     texte = "**📊 Statut des joueurs :**\n\n"
 
+    # Joueurs en jeu
     for user, start in en_jeu.items():
         diff = datetime.now() - start
         minutes = int(diff.total_seconds() // 60)
         texte += f"🟢 **{user}** — en jeu depuis **{minutes} min**\n"
 
+    # Joueurs déconnectés
     for user, stop_time in deco.items():
         diff = datetime.now() - stop_time
         minutes = int(diff.total_seconds() // 60)
