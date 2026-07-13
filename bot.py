@@ -26,20 +26,6 @@ bot = commands.Bot(command_prefix="!", intents=intents)
 
 CHANNEL_ID = 1526002817058344960
 
-# 🔥 Charger l'ID du message depuis un fichier
-def load_status_id():
-    if os.path.exists("status_id.txt"):
-        with open("status_id.txt", "r") as f:
-            return int(f.read().strip())
-    return None
-
-# 🔥 Sauvegarder l'ID du message dans un fichier
-def save_status_id(msg_id):
-    with open("status_id.txt", "w") as f:
-        f.write(str(msg_id))
-
-status_message_id = load_status_id()
-
 en_jeu = {}
 deco = {}
 
@@ -54,30 +40,25 @@ async def unpin_old_messages(channel, keep_id):
                 pass
 
 
+# 🔥 Toujours récupérer le message épinglé → jamais fetch_message
 async def get_or_create_status_message():
-    global status_message_id
-
     channel = bot.get_channel(CHANNEL_ID)
     if channel is None:
         print("⚠️ Le bot ne voit pas le salon.")
         return None
 
-    # 🔥 Si un ID est connu → on récupère le message
-    if status_message_id is not None:
-        try:
-            msg = await channel.fetch_message(status_message_id)
-            return msg
-        except:
-            pass  # Le message n'existe plus → on le recrée
+    pinned = await channel.pins()
+
+    # 🔥 Si un message est épinglé → c'est le message de statut
+    if pinned:
+        return pinned[0]
 
     # 🔥 Sinon on crée un nouveau message
     msg = await channel.send("📊 Statut des joueurs :\n\nChargement...")
     await asyncio.sleep(1)
     await msg.pin()
 
-    status_message_id = msg.id
-    save_status_id(msg.id)
-
+    # 🔥 Désépingle les anciens
     await unpin_old_messages(channel, msg.id)
 
     return msg
@@ -90,13 +71,11 @@ async def update_status():
 
     texte = "**📊 Statut des joueurs :**\n\n"
 
-    # Joueurs en jeu
     for user, start in en_jeu.items():
         diff = datetime.now() - start
         minutes = int(diff.total_seconds() // 60)
         texte += f"🟢 **{user}** — en jeu depuis **{minutes} min**\n"
 
-    # Joueurs déconnectés
     for user, stop_time in deco.items():
         diff = datetime.now() - stop_time
         minutes = int(diff.total_seconds() // 60)
@@ -104,9 +83,11 @@ async def update_status():
 
     await msg.edit(content=texte)
 
+    # 🔥 S'assurer qu'il reste épinglé
     if not msg.pinned:
         await msg.pin()
 
+    # 🔥 Désépingle les anciens
     await unpin_old_messages(msg.channel, msg.id)
 
 
@@ -145,47 +126,31 @@ async def unpinall(ctx):
     count = 0
 
     for msg in pinned:
-        if msg.id != status_message_id:
+        try:
             await msg.unpin()
             count += 1
+        except:
+            pass
 
     await ctx.send(f"J'ai désépinglé {count} message(s).")
 
 
-# 🔥 Commande pour recréer complètement le message de statut
 @bot.command()
 async def resetstatus(ctx):
-    global status_message_id, en_jeu, deco
-
     channel = bot.get_channel(CHANNEL_ID)
 
-    # Supprimer l'ancien message
-    if status_message_id is not None:
-        try:
-            old_msg = await channel.fetch_message(status_message_id)
-            await old_msg.delete()
-        except:
-            pass
-
-    # Désépingle tout
+    # 🔥 Supprimer tous les messages épinglés
     pinned = await channel.pins()
     for msg in pinned:
         try:
-            await msg.unpin()
+            await msg.delete()
         except:
             pass
 
-    # Reset des données
-    en_jeu = {}
-    deco = {}
-
-    # Nouveau message propre
+    # 🔥 Nouveau message propre
     new_msg = await channel.send("📊 Statut des joueurs :\n\nAucun joueur enregistré.")
     await asyncio.sleep(1)
     await new_msg.pin()
-
-    status_message_id = new_msg.id
-    save_status_id(new_msg.id)
 
     await ctx.send("Le message de statut a été réinitialisé.")
 
