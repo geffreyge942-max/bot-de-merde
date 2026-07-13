@@ -8,6 +8,7 @@ bot = commands.Bot(command_prefix="!", intents=intents)
 
 CHANNEL_ID = 1526002817058344960
 status_message_id = None
+
 en_jeu = {}
 deco = {}
 
@@ -16,14 +17,13 @@ async def get_or_create_status_message():
 
     channel = bot.get_channel(CHANNEL_ID)
 
-    # Si on a déjà un ID, on essaie de récupérer le message
+    # Si on a un ID, on essaie de récupérer le message
     if status_message_id is not None:
         try:
             msg = await channel.fetch_message(status_message_id)
             return msg
         except:
-            # Le message n'existe plus → on va le recréer
-            pass
+            pass  # Le message n'existe plus → on le recrée
 
     # Créer un nouveau message
     msg = await channel.send("📊 Statut des joueurs :\n\nChargement...")
