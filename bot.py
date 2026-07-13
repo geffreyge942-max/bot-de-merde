@@ -17,6 +17,7 @@ Thread(target=run).start()
 # --- Bot Discord ---
 from datetime import datetime
 import os
+import asyncio
 import discord
 from discord.ext import commands
 
@@ -25,42 +26,85 @@ bot = commands.Bot(command_prefix="!", intents=intents)
 
 CHANNEL_ID = 1526002817058344960
 
+# 🔥 Charger l'ID du message depuis un fichier
+def load_status_id():
+    if os.path.exists("status_id.txt"):
+        with open("status_id.txt", "r") as f:
+            return int(f.read().strip())
+    return None
+
+# 🔥 Sauvegarder l'ID du message dans un fichier
+def save_status_id(msg_id):
+    with open("status_id.txt", "w") as f:
+        f.write(str(msg_id))
+
+status_message_id = load_status_id()
+
 en_jeu = {}
 deco = {}
 
-# 🔥 Toujours récupérer le message épinglé → jamais fetch_message
-async def get_or_create_status_message():
-    channel = bot.get_channel(CHANNEL_ID)
-
-    # 🔥 Si un message est épinglé → c'est le message de statut
+async def unpin_old_messages(channel, keep_id):
     pinned = await channel.pins()
-    if pinned:
-        return pinned[0]
+    for msg in pinned:
+        if msg.id != keep_id:
+            try:
+                await msg.unpin()
+            except:
+                pass
+
+
+async def get_or_create_status_message():
+    global status_message_id
+
+    channel = bot.get_channel(CHANNEL_ID)
+    if channel is None:
+        print("⚠️ Le bot ne voit pas le salon.")
+        return None
+
+    # 🔥 Si un ID est connu → on récupère le message
+    if status_message_id is not None:
+        try:
+            msg = await channel.fetch_message(status_message_id)
+            return msg
+        except:
+            pass
 
     # 🔥 Sinon on crée un nouveau message
     msg = await channel.send("📊 Statut des joueurs :\n\nChargement...")
+    await asyncio.sleep(1)
     await msg.pin()
+
+    status_message_id = msg.id
+    save_status_id(msg.id)
+
+    await unpin_old_messages(channel, msg.id)
+
     return msg
 
 
 async def update_status():
     msg = await get_or_create_status_message()
+    if msg is None:
+        return
 
     texte = "**📊 Statut des joueurs :**\n\n"
 
-    # Joueurs en jeu
     for user, start in en_jeu.items():
         diff = datetime.now() - start
         minutes = int(diff.total_seconds() // 60)
         texte += f"🟢 **{user}** — en jeu depuis **{minutes} min**\n"
 
-    # Joueurs déconnectés
     for user, stop_time in deco.items():
         diff = datetime.now() - stop_time
         minutes = int(diff.total_seconds() // 60)
         texte += f"🔴 **{user}** — déconnecté depuis **{minutes} min**\n"
 
     await msg.edit(content=texte)
+
+    if not msg.pinned:
+        await msg.pin()
+
+    await unpin_old_messages(msg.channel, msg.id)
 
 
 @bot.event
@@ -89,6 +133,57 @@ async def stop(ctx):
     en_jeu.pop(user, None)
     await update_status()
     await ctx.send(f"{user} vient de se déconnecter.")
+
+
+@bot.command()
+async def unpinall(ctx):
+    channel = bot.get_channel(CHANNEL_ID)
+    pinned = await channel.pins()
+    count = 0
+
+    for msg in pinned:
+        if msg.id != status_message_id:
+            await msg.unpin()
+            count += 1
+
+    await ctx.send(f"J'ai désépinglé {count} message(s).")
+
+
+@bot.command()
+async def resetstatus(ctx):
+    global status_message_id, en_jeu, deco
+
+    channel = bot.get_channel(CHANNEL_ID)
+
+    # Supprimer l'ancien message
+    if status_message_id is not None:
+        try:
+            old_msg = await channel.fetch_message(status_message_id)
+            await old_msg.delete()
+        except:
+            pass
+
+    # Désépingle tout
+    pinned = await channel.pins()
+    for msg in pinned:
+        try:
+            await msg.unpin()
+        except:
+            pass
+
+    # Reset des données
+    en_jeu = {}
+    deco = {}
+
+    # Nouveau message propre
+    new_msg = await channel.send("📊 Statut des joueurs :\n\nAucun joueur enregistré.")
+    await asyncio.sleep(1)
+    await new_msg.pin()
+
+    status_message_id = new_msg.id
+    save_status_id(new_msg.id)
+
+    await ctx.send("Le message de statut a été réinitialisé.")
 
 
 bot.run(os.getenv("TOKEN"))
