@@ -17,6 +17,7 @@ Thread(target=run).start()
 # --- Ton bot Discord ---
 from datetime import datetime
 import os
+import asyncio
 import discord
 from discord.ext import commands
 
@@ -44,35 +45,27 @@ async def get_or_create_status_message():
     global status_message_id
 
     channel = bot.get_channel(CHANNEL_ID)
-
     if channel is None:
         print("⚠️ Le bot ne voit pas le salon. Vérifie l'ID.")
         return None
 
-    # Si un message existe déjà, on tente de le récupérer
-    if status_message_id is not None:
-        try:
-            msg = await channel.fetch_message(status_message_id)
+    # 🔥 Si un message est déjà épinglé → on le récupère automatiquement
+    pinned = await channel.pins()
+    if pinned:
+        msg = pinned[0]
+        status_message_id = msg.id
+        return msg
 
-            # 🔥 On s'assure qu'il est épinglé
-            if not msg.pinned:
-                await msg.pin()
-
-            # 🔥 On désépingle les anciens
-            await unpin_old_messages(channel, msg.id)
-
-            return msg
-        except:
-            pass
-
-    # Sinon on crée un nouveau message
+    # 🔥 Sinon on recrée un message propre
     msg = await channel.send("📊 Statut des joueurs :\n\nChargement...")
-    status_message_id = msg.id
 
-    # 🔥 On épingle le nouveau message
+    # ⏳ Attendre que Discord enregistre le message avant de l'épingler
+    await asyncio.sleep(1)
+
+    status_message_id = msg.id
     await msg.pin()
 
-    # 🔥 On désépingle les anciens
+    # 🔥 Désépingle les anciens messages
     await unpin_old_messages(channel, msg.id)
 
     return msg
@@ -85,11 +78,13 @@ async def update_status():
 
     texte = "**📊 Statut des joueurs :**\n\n"
 
+    # Joueurs en jeu
     for user, start in en_jeu.items():
         diff = datetime.now() - start
         minutes = int(diff.total_seconds() // 60)
         texte += f"🟢 **{user}** — en jeu depuis **{minutes} min**\n"
 
+    # Joueurs déconnectés
     for user, stop_time in deco.items():
         diff = datetime.now() - stop_time
         minutes = int(diff.total_seconds() // 60)
@@ -97,11 +92,11 @@ async def update_status():
 
     await msg.edit(content=texte)
 
-    # 🔥 On s'assure qu'il reste épinglé
+    # 🔥 S'assurer qu'il reste épinglé
     if not msg.pinned:
         await msg.pin()
 
-    # 🔥 On désépingle les anciens
+    # 🔥 Désépingle les anciens
     await unpin_old_messages(msg.channel, msg.id)
 
 
