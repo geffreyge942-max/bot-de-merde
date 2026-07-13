@@ -7,7 +7,7 @@ import asyncio
 intents = discord.Intents.all()
 bot = commands.Bot(command_prefix="!", intents=intents)
 
-CHANNEL_ID = 1526002817058344960
+CHANNEL_ID = 1526232996175413280
 status_message_id = None
 
 # 🔥 Juste des listes simples
